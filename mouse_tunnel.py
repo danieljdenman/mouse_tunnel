@@ -14,7 +14,7 @@ from numpy import arange,concatenate
 
 #this is used to change whether the mouse's running and licking control the rewards.
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
-AUTO_MODE=True
+AUTO_MODE=False
 
 # Global variables for the tunnel dimensions and speed of travel
 TUNNEL_SEGMENT_LENGTH = 50
@@ -125,10 +125,6 @@ class MouseTunnel(ShowBase):
         if AUTO_MODE:
             self.gameTask = taskMgr.add(self.autoLoop, "autoLoop")
             # self.contTunnel()
-                
-                
-                
-                
         else:
             # Now we create the task. taskMgr is the task manager that actually
             # calls the function each frame. The add method creates a new task.
@@ -205,7 +201,7 @@ class MouseTunnel(ShowBase):
                 self.card.setTexture(self.imageTextures[i],1)
         if self.stimtype=='image_sequence':
             self.imagesTexture.setTime(0.)
-            # self.dr2.setDimensions(0.5, 0.9, 0.5, 0.8)
+            self.dr2.setDimensions(0.5, 0.9, 0.5, 0.8)
             self.imagesTexture.play()
     
     def stop_a_presentation(self):
@@ -256,7 +252,7 @@ class MouseTunnel(ShowBase):
                                 self.stop_a_presentation()
                                 self.time_waited=0
                                 self.looking_for_a_cue_zone = False
-                                self.check_licks()
+                                # self.check_licks()
                         # base.setBackgroundColor([0, 0, 1])
                     else:
                         pass# base.setBackgroundColor([0, 1, 0])
