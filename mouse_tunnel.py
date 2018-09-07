@@ -117,6 +117,7 @@ class MouseTunnel(ShowBase):
         self.reward_window = 1.0 # in seconds
         self.reward_elapsed = 0.0
         self.reward_volume = 0.05 # in uL
+        self.lick_buffer = []
         
         img_list = glob.glob('models/NaturalImages/*.tiff')[:10]
         print img_list
@@ -175,7 +176,7 @@ class MouseTunnel(ShowBase):
         # Set the scale to be apropriate (since attributes like scale are
         # inherited, the rest of the segments have a scale of 1)
         self.tunnel[0].setScale(.155, .155, .305)
-        # Set the new back to the values that the rest of teh segments have
+        # Set the new back to the values that the rest of the segments have
         self.tunnel[3].reparentTo(self.tunnel[2])
         self.tunnel[3].setZ(-TUNNEL_SEGMENT_LENGTH)
         self.tunnel[3].setScale(1)
@@ -196,6 +197,8 @@ class MouseTunnel(ShowBase):
         print "start"
         # self.bufferViewer.toggleEnable()
         
+        self.lick_buffer = []
+        
         if self.stimtype == 'random image':
             for i in range(randint(len(self.imageTextures))):
                 self.card.setTexture(self.imageTextures[i],1)
@@ -211,9 +214,21 @@ class MouseTunnel(ShowBase):
             self.stim_started=False
             self.stim_elapsed=0.
             self.stim_duration = exponential(30.)
-    
+            self.check_licks()
+
+    def read_licks(self):
+        licks = [] # not yet implemented; should be replaces with check to beam break
+        self.lick_buffer.extend(licks)
+        
+    def check_licks(self): #not yet implemented
+        licked = False # replace this with an actual check to what is in self.lick_buffer
+        if licked:
+            self.give_reward()
+        pass
+ 
     def give_reward():
         vol=self.reward_volume
+        # put a TTL on a line to indicate that a reward was given
         pass # not yet implemented
    
     def gameLoop(self, task):
@@ -252,7 +267,6 @@ class MouseTunnel(ShowBase):
                                 self.stop_a_presentation()
                                 self.time_waited=0
                                 self.looking_for_a_cue_zone = False
-                                # self.check_licks()
                         # base.setBackgroundColor([0, 0, 1])
                     else:
                         pass# base.setBackgroundColor([0, 1, 0])
@@ -363,6 +377,10 @@ class MouseTunnel(ShowBase):
         else: pass#print('current:'+str(position_on_track) +'      next boundary:' + str(self.boundary_to_add_next_segment))
 
         self.last_position = position_on_track
+        
+        #check the lick buffer. if false alarm, abort. if not
+        self.read_licks()
+        
         return Task.cont    # Since every return is Task.cont, the task will
         # free run task indefinitely, under fixed conditions to demonstrate to mouse
         
