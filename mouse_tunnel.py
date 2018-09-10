@@ -11,6 +11,13 @@ import sys,glob,time
 from math import pi, sin, cos
 from numpy.random import randint, exponential
 from numpy import arange,concatenate
+import numpy as np
+from pyglet.window import key
+
+try:
+    from aibs.iodaq import DigitalInput,DigitalOutput, AnalogInput, AnalogOutput
+except Exception, e:
+    print("could not import iodaq.", e)
 
 #this is used to change whether the mouse's running and licking control the rewards.
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
@@ -109,7 +116,8 @@ class MouseTunnel(ShowBase):
         self.interval=0
         self.time_waiting_in_cue_zone=0
         self.wait_time=1.0
-        self.stim_duration= 8.0 # in seconds
+        self.stim_duration= 12.0 # in seconds
+        self.max_stim_duration = 24.0 # in seconds
         self.stim_elapsed= 0.0 # in seconds
         self.last_position = base.camera.getZ()
         self.position_on_track = base.camera.getZ()
@@ -117,7 +125,23 @@ class MouseTunnel(ShowBase):
         self.reward_window = 1.0 # in seconds
         self.reward_elapsed = 0.0
         self.reward_volume = 0.05 # in uL
-        self.lick_buffer = []
+        # self.lick_buffer = []
+
+        
+        
+        self.nidevice = 'Dev1'
+        self.encodervinchannel = 0
+        self.encodervsigchannel = 1
+        self.invertdo = False
+        self.diport = 0
+        self.doport = 1
+        self.rewardline = 0
+        self.rewardlines = [0]
+        #INITIALIZE NIDAQ
+        self._setupDAQ()
+        #INITIALIZE LICK SENSOR
+        self._lickSensorSetup()
+        self.lickData = []
         
         img_list = glob.glob('models/NaturalImages/*.tiff')[:10]
         print img_list
@@ -134,6 +158,7 @@ class MouseTunnel(ShowBase):
             # is passed to the function each frame.
             self.gameTask = taskMgr.add(self.gameLoop, "gameLoop")
             # self.stimulusTask = taskMgr.add(self.stimulusControl, "stimulus")
+            self.lickTask = taskMgr.add(self.lickControl, "lick")
             self.rewardTask = taskMgr.add(self.rewardControl, "reward")
     
     # Code to initialize the tunnel
@@ -213,21 +238,38 @@ class MouseTunnel(ShowBase):
             # self.bufferViewer.toggleEnable()
             self.stim_started=False
             self.stim_elapsed=0.
-            self.stim_duration = exponential(30.)
-            self.check_licks()
+            self.stim_duration = exponential(self.max_stim_duration)
+            self.stim_off_time = globalClock.getFrameTime()
 
-    def read_licks(self):
-        licks = [] # not yet implemented; should be replaces with check to beam break
-        self.lick_buffer.extend(licks)
-        
-    def check_licks(self): #not yet implemented
-        licked = False # replace this with an actual check to what is in self.lick_buffer
-        if licked:
-            self.give_reward()
-        pass
+
+    def _lickSensorSetup(self):
+        """ Attempts to set up lick sensor NI task. """
+        ##TODO: Make lick sensor object if necessary. Let user select port and line.
+        if self.di:
+            self.lickSensor = self.di  # just use DI for now
+            licktest = []
+            for i in range(30):
+                licktest.append(self.di.Read()[self.rewardlines[0]])
+                time.sleep(0.01)
+            licktest = np.array(licktest, dtype=np.uint8)
+            if len(licktest[np.where(licktest > 0)]) > 25:
+                self.lickSensor = None
+                self.lickData = [np.zeros(len(self.rewardlines))]
+                print "Lick sensor failed startup test."
+        else:
+            print "Could not initialize lick sensor.  Ensure that NIDAQ is connected properly."
+            self.keycontrol = True
+            self.lickSensor = None
+            self.lickData = [np.zeros(len(self.rewardlines))]
+            self.keys = key.KeyStateHandler()
+            # self.window.winHandle.push_handlers(self.keys)
+            
+    # def _read_licks(self): # not yet implemented; should be replaces with check to beam break
+
  
-    def give_reward():
+    def _give_reward(self):
         vol=self.reward_volume
+        print "reward!"
         # put a TTL on a line to indicate that a reward was given
         pass # not yet implemented
    
@@ -302,6 +344,7 @@ class MouseTunnel(ShowBase):
         else: pass#print('current:'+str(position_on_track) +'      next boundary:' + str(self.boundary_to_add_next_segment))
 
         self.last_position = position_on_track
+        # self._read_licks()
         return Task.cont    # Since every return is Task.cont, the task will
         # continue indefinitely, under control of the mouse
         
@@ -393,15 +436,36 @@ class MouseTunnel(ShowBase):
             self.dr2.setDimensions(0,0.1,0,0.1)
         return Task.cont
     
+    def lickControl(self,task):
+        """ Checks to see if a lick is occurring. """
+        ##TODO: Let user select line for lick sensing.
+        if self.lickSensor:
+            data = self.lickSensor.Read()[self.rewardlines]
+            self.lickData.extend(data)
+        elif self.keycontrol == True: #NO NI BOARD.  KEY INPUT?
+            if self.keys[key.SPACE]:
+                data = [globalClock.getFrameTime()]
+            elif self.keys[key.NUM_1]:
+                print self.lickData
+            # elif self.keys[key.NUM_3]:
+            #     data = [0,1]
+            # else:
+            #     data = [0,0]
+                self.lickData.extend(data)
+        return Task.cont
+                
     def rewardControl(self,task):
+        lick=False
         if self.in_reward_window:
             self.reward_elapsed+=globalClock.getDt()
-            lick=True#-->TODO: check for licks
+            if len(np.where(self.lickData > self.stim_off_time)[0]) > 1: # this checks if there has been more than zero licks since the stimulus turned off
+                lick=True
+                print len(np.where(self.lickData > self.stim_off_time)[0])
+                print self.lickData
             if lick:
-                #TODO: trigger reward
-                #and reset
+                self._give_reward()
                 self.in_reward_window=False
-                self.reward_elapsed=0.
+                # self.reward_elapsed=0.
                 # base.setBackgroundColor([1, 1, 0])
 
         if self.reward_elapsed > self.reward_window:
@@ -409,5 +473,43 @@ class MouseTunnel(ShowBase):
             self.reward_elapsed=0.
         return Task.cont
     
+    
+    def _setupDAQ(self):
+        """ Sets up some digital IO for sync and tiggering. """
+        try:
+            if self.invertdo:
+                istate = 'low'
+            else:
+                istate = 'high'
+            self.do = DigitalOutput(self.nidevice, self.doport,
+                                    initial_state=istate)
+            self.do.StartTask()
+        except Exception, e:
+            print "Error starting DigitalOutput task:", e
+            self.do = None
+        try:
+            self.di = DigitalInput(self.nidevice, self.diport)
+            self.di.StartTask()
+        except Exception, e:
+            print "Error starting DigitalInput task:", e
+            self.di = None
+        try:
+            #set up 8 channels, only use 2 though for now
+            self.ai = AnalogInput(self.nidevice, range(8), buffer_size=25,
+                                  clock_speed=6000.0)
+            self.ai.StartTask()
+        except Exception, e:
+            print "Error starting AnalogInput task:", e
+            self.ai = None
+
+        try:
+            self.ao = AnalogOutput(self.nidevice, channels=[0, 1],
+                                   voltage_range=[0.0, 5.0])
+            self.ao.StartTask()
+        except Exception, e:
+            print "Error starting AnalogOutput task:", e
+            self.ao = None
+            
+            
 app = MouseTunnel()
 app.run()
