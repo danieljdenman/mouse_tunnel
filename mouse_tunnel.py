@@ -7,7 +7,7 @@ from direct.interval.LerpInterval import LerpFunc
 from direct.interval.FunctionInterval import Func
 from panda3d.core import Mat4, WindowProperties, CardMaker, NodePath, TextureStage, MovieTexture, MovieVideo
 
-import sys,glob,time
+import sys,glob,time,datetime,os
 from math import pi, sin, cos
 from numpy.random import randint, exponential
 from numpy import arange,concatenate
@@ -15,9 +15,11 @@ import numpy as np
 from pyglet.window import key
 
 try:
-    from aibs.iodaq import DigitalInput,DigitalOutput, AnalogInput, AnalogOutput
-except Exception, e:
-    print("could not import iodaq.", e)
+    from toolbox.toolbox.IO.nidaq import DigitalInput,DigitalOutput, AnalogInput, AnalogOutput
+except:# Exception, e:
+    print("could not import iodaq.")
+
+mouse_id = 'test'
 
 #this is used to change whether the mouse's running and licking control the rewards.
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
@@ -34,9 +36,13 @@ class MouseTunnel(ShowBase):
         # create a window and set up everything we need for rendering into it.
         ShowBase.__init__(self)
         self.stimtype='image_sequence'
-            
-        self.accept("escape", sys.exit, [0])
         
+        #session_start
+        self.session_start_time = datetime.datetime.now()
+
+        self.accept("escape", sys.exit, [0])
+        self.accept('q', self.close)
+        self.accept('Q', self.close)
         # disable mouse control so that we can place the camera
         base.disableMouse()
         camera.setPosHpr(0, 0, 10, 0, -90, 0)
@@ -78,13 +84,13 @@ class MouseTunnel(ShowBase):
         
         self.imagesTexture=MovieTexture("image_sequence")
         # success = self.imagesTexture.read("models/natural_images.avi")
-        success = self.imagesTexture.read("models/movie3.mp4")
+        # success = self.imagesTexture.read("models/movie3.mp4")
         self.imagesTexture.setPlayRate(1.0)
         self.imagesTexture.setLoopCount(10)
         # self.imageTexture =loader.loadTexture("models/NaturalImages/BSDs_8143.tiff")
         # self.imagesTexture.reparentTo(altRender)
         
-        cm = CardMaker("stimwindow");
+        cm = CardMaker("stimwindow")
         cm.setFrame(-4,4,-3,3)
         # cm.setUvRange(self.imagesTexture)
         self.card = NodePath(cm.generate())
@@ -128,23 +134,36 @@ class MouseTunnel(ShowBase):
         # self.lick_buffer = []
 
         
-        
+        #INITIALIZE NIDAQ
         self.nidevice = 'Dev1'
         self.encodervinchannel = 0
         self.encodervsigchannel = 1
         self.invertdo = False
-        self.diport = 0
-        self.doport = 1
+        self.diport = 1
+        self.lickline = 1
+        self.doport = 0
         self.rewardline = 0
         self.rewardlines = [0]
-        #INITIALIZE NIDAQ
         self._setupDAQ()
+        self.do.WriteBit(1,1)
+       
         #INITIALIZE LICK SENSOR
         self._lickSensorSetup()
+   
+
+        #INITIALIZE  output data
         self.lickData = []
-        
+        self.x = []
+        self.t = []
+        self.trialData = []
+        self.rewardData = []
+
+        #INITIALIZE KEY SENSOR, for backup inputs and other user controls
+        self.keys = key.KeyStateHandler()
+        self.accept('r', self._give_reward, [self.reward_volume])
+
         img_list = glob.glob('models/NaturalImages/*.tiff')[:10]
-        print img_list
+        print(img_list)
         self.imageTextures =[loader.loadTexture(img) for img in img_list]
         
         if AUTO_MODE:
@@ -219,7 +238,8 @@ class MouseTunnel(ShowBase):
    
     def start_a_presentation(self):
 
-        print "start"
+        print("start")
+        self.do.WriteBit(2,1)
         # self.bufferViewer.toggleEnable()
         
         self.lick_buffer = []
@@ -231,6 +251,7 @@ class MouseTunnel(ShowBase):
             self.imagesTexture.setTime(0.)
             self.dr2.setDimensions(0.5, 0.9, 0.5, 0.8)
             self.imagesTexture.play()
+        
     
     def stop_a_presentation(self):
         if self.stim_started==True:
@@ -240,7 +261,7 @@ class MouseTunnel(ShowBase):
             self.stim_elapsed=0.
             self.stim_duration = exponential(self.max_stim_duration)
             self.stim_off_time = globalClock.getFrameTime()
-
+            self.do.WriteBit(2,0)
 
     def _lickSensorSetup(self):
         """ Attempts to set up lick sensor NI task. """
@@ -249,15 +270,15 @@ class MouseTunnel(ShowBase):
             self.lickSensor = self.di  # just use DI for now
             licktest = []
             for i in range(30):
-                licktest.append(self.di.Read()[self.rewardlines[0]])
+                licktest.append(self.di.Read()[self.lickline])
                 time.sleep(0.01)
             licktest = np.array(licktest, dtype=np.uint8)
             if len(licktest[np.where(licktest > 0)]) > 25:
                 self.lickSensor = None
                 self.lickData = [np.zeros(len(self.rewardlines))]
-                print "Lick sensor failed startup test."
+                print("Lick sensor failed startup test.")
         else:
-            print "Could not initialize lick sensor.  Ensure that NIDAQ is connected properly."
+            print("Could not initialize lick sensor.  Ensure that NIDAQ is connected properly.")
             self.keycontrol = True
             self.lickSensor = None
             self.lickData = [np.zeros(len(self.rewardlines))]
@@ -265,14 +286,15 @@ class MouseTunnel(ShowBase):
             # self.window.winHandle.push_handlers(self.keys)
             
     # def _read_licks(self): # not yet implemented; should be replaces with check to beam break
-
- 
-    def _give_reward(self):
-        vol=self.reward_volume
-        print "reward!"
+    def _give_reward(self,volume):
+        print("reward!")
+        self.rewardData.extend([globalClock.getFrameTime()])
+        self.do.WriteBit(4,1)
+        time.sleep(0.1)
+        self.do.WriteBit(4,0)
         # put a TTL on a line to indicate that a reward was given
         pass # not yet implemented
-   
+
     def gameLoop(self, task):
         # get the time elapsed since the next frame.  
         dt = globalClock.getDt()
@@ -280,7 +302,9 @@ class MouseTunnel(ShowBase):
 
         # get the camera position.
         position_on_track = base.camera.getZ()
-        
+        self.x.extend([position_on_track])
+        self.t.extend([globalClock.getFrameTime()])
+
         #first check if the mouse moved on the last frame.
         if abs(self.last_position - position_on_track) < .5: #the mouse didn't move more than 0.5 units on the track
             self.moved=False
@@ -344,6 +368,8 @@ class MouseTunnel(ShowBase):
         else: pass#print('current:'+str(position_on_track) +'      next boundary:' + str(self.boundary_to_add_next_segment))
 
         self.last_position = position_on_track
+
+        # lick_times = self.
         # self._read_licks()
         return Task.cont    # Since every return is Task.cont, the task will
         # continue indefinitely, under control of the mouse
@@ -440,13 +466,14 @@ class MouseTunnel(ShowBase):
         """ Checks to see if a lick is occurring. """
         ##TODO: Let user select line for lick sensing.
         if self.lickSensor:
-            data = self.lickSensor.Read()[self.rewardlines]
-            self.lickData.extend(data)
+            if self.lickSensor.Read()[self.lickline]:
+                self.lickData.extend([globalClock.getFrameTime()])
+                print(self.lickData)
         elif self.keycontrol == True: #NO NI BOARD.  KEY INPUT?
             if self.keys[key.SPACE]:
                 data = [globalClock.getFrameTime()]
             elif self.keys[key.NUM_1]:
-                print self.lickData
+                print(self.lickData)
             # elif self.keys[key.NUM_3]:
             #     data = [0,1]
             # else:
@@ -455,61 +482,84 @@ class MouseTunnel(ShowBase):
         return Task.cont
                 
     def rewardControl(self,task):
-        lick=False
-        if self.in_reward_window:
-            self.reward_elapsed+=globalClock.getDt()
-            if len(np.where(self.lickData > self.stim_off_time)[0]) > 1: # this checks if there has been more than zero licks since the stimulus turned off
-                lick=True
-                print len(np.where(self.lickData > self.stim_off_time)[0])
-                print self.lickData
-            if lick:
-                self._give_reward()
-                self.in_reward_window=False
-                # self.reward_elapsed=0.
-                # base.setBackgroundColor([1, 1, 0])
+        pass
+        # lick=False
+        # if self.in_reward_window:
+        #     self.reward_elapsed+=globalClock.getDt()
+        #     if len(np.where(self.lickData > self.stim_off_time)[0]) > 1: # this checks if there has been more than zero licks since the stimulus turned off
+        #         lick=True
+        #         print(len(np.where(self.lickData > self.stim_off_time)[0]))
+        #         print(self.lickData)
+        #     if lick:
+        #         self._give_reward()
+        #         self.in_reward_window=False
+        #         # self.reward_elapsed=0.
+        #         # base.setBackgroundColor([1, 1, 0])
 
-        if self.reward_elapsed > self.reward_window:
-            self.in_reward_window=False
-            self.reward_elapsed=0.
+        # if self.keys[key.NUM_1]:
+        #     print('reward!')
+
+        # if self.reward_elapsed > self.reward_window:
+        #     self.in_reward_window=False
+        #     self.reward_elapsed=0.
         return Task.cont
-    
     
     def _setupDAQ(self):
         """ Sets up some digital IO for sync and tiggering. """
+        print('SETTING UP DAQ')
         try:
             if self.invertdo:
                 istate = 'low'
             else:
                 istate = 'high'
             self.do = DigitalOutput(self.nidevice, self.doport,
-                                    initial_state=istate)
+                                    initial_state='low')
             self.do.StartTask()
-        except Exception, e:
-            print "Error starting DigitalOutput task:", e
+        except:# Exception, e:
+            print("Error starting DigitalOutput task:")
             self.do = None
         try:
             self.di = DigitalInput(self.nidevice, self.diport)
             self.di.StartTask()
-        except Exception, e:
-            print "Error starting DigitalInput task:", e
+        except:# Exception, e:
+            print("Error starting DigitalInput task:")
             self.di = None
         try:
             #set up 8 channels, only use 2 though for now
             self.ai = AnalogInput(self.nidevice, range(8), buffer_size=25,
                                   clock_speed=6000.0)
             self.ai.StartTask()
-        except Exception, e:
-            print "Error starting AnalogInput task:", e
+        except:# Exception, e:
+            print("Error starting AnalogInput task:")
             self.ai = None
 
         try:
             self.ao = AnalogOutput(self.nidevice, channels=[0, 1],
                                    voltage_range=[0.0, 5.0])
             self.ao.StartTask()
-        except Exception, e:
-            print "Error starting AnalogOutput task:", e
+        except:# Exception, e:
+            print("Error starting AnalogOutput task:")
             self.ao = None
-            
-            
+
+    def close(self):
+        save_path = os.path.join(os.getcwd(),'data',str(mouse_id)+'_'+\
+                                                    str(self.session_start_time.year)+'_'+\
+                                                    str(self.session_start_time.month)+'_'+\
+                                                    str(self.session_start_time.day)+'-'+\
+                                                    str(self.session_start_time.hour)+'_'+\
+                                                    str(self.session_start_time.minute)+'_'+\
+                                                    str(self.session_start_time.second))
+        if ~os.path.isdir(save_path):
+            os.mkdir(save_path)
+        np.save(os.path.join(save_path,'licks.npy'),self.lickData)
+        np.save(os.path.join(save_path,'x.npy'),self.x)
+        np.save(os.path.join(save_path,'t.npy'),self.t)
+        np.save(os.path.join(save_path,'trialData.npy'),self.trialData)
+        np.save(os.path.join(save_path,'rewardData.npy'),self.rewardData)
+        sys.exit  
+
+    
+
+
 app = MouseTunnel()
 app.run()
