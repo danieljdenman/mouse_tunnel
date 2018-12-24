@@ -131,6 +131,7 @@ class MouseTunnel(ShowBase):
         self.reward_window = 1.0 # in seconds
         self.reward_elapsed = 0.0
         self.reward_volume = 0.05 # in uL
+        self.reward_time = 0.1 # in sec, based on volume. hard coded right now but should be modified by the (1) calibration and (2) optionally by the main loop for dynamic reward scheduling
         # self.lick_buffer = []
 
         
@@ -146,6 +147,7 @@ class MouseTunnel(ShowBase):
         self.rewardlines = [0]
         self._setupDAQ()
         self.do.WriteBit(1,1)
+        self.do.WriteBit(3,1)#set reward high, because the logic is flipped somehow. possibly by haphazard wiring of the circuit (12/24/2018 djd)
        
         #INITIALIZE LICK SENSOR
         self._lickSensorSetup()
@@ -289,9 +291,9 @@ class MouseTunnel(ShowBase):
     def _give_reward(self,volume):
         print("reward!")
         self.rewardData.extend([globalClock.getFrameTime()])
-        self.do.WriteBit(4,1)
-        time.sleep(0.1)
-        self.do.WriteBit(4,0)
+        self.do.WriteBit(3,0)
+        time.sleep(self.reward_time)
+        self.do.WriteBit(3,1)
         # put a TTL on a line to indicate that a reward was given
         pass # not yet implemented
 
@@ -468,12 +470,12 @@ class MouseTunnel(ShowBase):
         if self.lickSensor:
             if self.lickSensor.Read()[self.lickline]:
                 self.lickData.extend([globalClock.getFrameTime()])
-                print(self.lickData)
+                # print(self.lickData)
         elif self.keycontrol == True: #NO NI BOARD.  KEY INPUT?
             if self.keys[key.SPACE]:
                 data = [globalClock.getFrameTime()]
             elif self.keys[key.NUM_1]:
-                print(self.lickData)
+                # print(self.lickData)
             # elif self.keys[key.NUM_3]:
             #     data = [0,1]
             # else:
