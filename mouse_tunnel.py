@@ -24,6 +24,7 @@ mouse_id = 'test'
 #this is used to change whether the mouse's running and licking control the rewards.
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
 AUTO_MODE=False
+#AUTO_MODE=True
 
 # Global variables for the tunnel dimensions and speed of travel
 TUNNEL_SEGMENT_LENGTH = 50
@@ -43,23 +44,22 @@ class MouseTunnel(ShowBase):
         self.accept("escape", sys.exit, [0])
         self.accept('q', self.close)
         self.accept('Q', self.close)
+
         # disable mouse control so that we can place the camera
         base.disableMouse()
         camera.setPosHpr(0, 0, 10, 0, -90, 0)
-        # camera.setHpr(90, 0, 0)
         mat=Mat4(camera.getMat())
         mat.invertInPlace()
         base.mouseInterfaceNode.setMat(mat)
-        base.enableMouse()
+        # base.enableMouse()
         
         props = WindowProperties()
+        props.setFullscreen(True)
         props.setCursorHidden(True)
         props.setMouseMode(WindowProperties.M_relative)
         base.win.requestProperties(props)
-        
         base.setBackgroundColor(0, 0, 0)  # set the background color to black
-        # base.enableMouse()
-        
+
         #set up the textures
         # we now get buffer thats going to hold the texture of our new scene
         altBuffer = self.win.makeTextureBuffer("hello", 1524, 1024)
@@ -148,11 +148,12 @@ class MouseTunnel(ShowBase):
         self._setupDAQ()
         self.do.WriteBit(1,1)
         self.do.WriteBit(3,1)#set reward high, because the logic is flipped somehow. possibly by haphazard wiring of the circuit (12/24/2018 djd)
-       
+        self.previous_encoder_position = self.ai.data[0][2]
+        self.encoder_gain = -20
+
         #INITIALIZE LICK SENSOR
         self._lickSensorSetup()
    
-
         #INITIALIZE  output data
         self.lickData = []
         self.x = []
@@ -169,8 +170,12 @@ class MouseTunnel(ShowBase):
         self.imageTextures =[loader.loadTexture(img) for img in img_list]
         
         if AUTO_MODE:
-            self.gameTask = taskMgr.add(self.autoLoop, "autoLoop")
-            # self.contTunnel()
+            self.gameTask = taskMgr.add(self.autoLoop2, "autoLoop2")
+            self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-10,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-10,-1)))
+            self.auto_position_on_track = 0
+            self.auto_restart = False
+            self.auto_running = True
+            self.contTunnel()
         else:
             # Now we create the task. taskMgr is the task manager that actually
             # calls the function each frame. The add method creates a new task.
@@ -210,34 +215,59 @@ class MouseTunnel(ShowBase):
     # This function is called to snap the front of the tunnel to the back
     # to simulate traveling through it
     def contTunnel(self):
-        # This line uses slices to take the front of the list and put it on the
-        # back. For more information on slices check the Python manual
-        self.tunnel = self.tunnel[1:] + self.tunnel[0:1]
-        
-        # Set the front segment (which was at TUNNEL_SEGMENT_LENGTH) to 0, which
-        # is where the previous segment started
-        self.tunnel[0].setZ(0)
-        # Reparent the front to render to preserve the hierarchy outlined above
-        self.tunnel[0].reparentTo(render)
-        # Set the scale to be apropriate (since attributes like scale are
-        # inherited, the rest of the segments have a scale of 1)
-        self.tunnel[0].setScale(.155, .155, .305)
-        # Set the new back to the values that the rest of the segments have
-        self.tunnel[3].reparentTo(self.tunnel[2])
-        self.tunnel[3].setZ(-TUNNEL_SEGMENT_LENGTH)
-        self.tunnel[3].setScale(1)
-    
-        # Set up the tunnel to move one segment and then call contTunnel again
-        # to make the tunnel move infinitely
-        self.tunnelMove = Sequence(
-            LerpFunc(self.tunnel[0].setZ,
-                     duration=TUNNEL_TIME,
-                     fromData=0,
-                     toData=TUNNEL_SEGMENT_LENGTH * .305),
-            Func(self.contTunnel)
-        )
-        self.tunnelMove.start()
-   
+        self.auto_position_on_track -= 50
+        position_on_track = self.auto_position_on_track - 11
+        print(str(int(position_on_track))+'   '+ str(self.cue_zone))
+        if int(position_on_track) in np.array(self.cue_zone): #check for cue zone
+            if not self.auto_restart:
+                print('STOP!')
+                self.tunnelMove.pause()
+                self.auto_presentation = True
+                # self.current_number_of_segments +=1
+            else:
+                self.auto_restart = True
+                self.tunnelMove.resume()
+
+        else:
+            self.in_waiting_period=False
+            self.auto_presentation=False
+
+            # base.setBackgroundColor([1,0 , 0])
+            if self.looking_for_a_cue_zone == False:
+                self.looking_for_a_cue_zone = True
+            if self.stim_started==True:
+                self.stop_a_presentation()  
+
+            # This line uses slices to take the front of the list and put it on the
+            # back. For more information on slices check the Python manual
+            self.tunnel = self.tunnel[1:] + self.tunnel[0:1]
+            
+            # Set the front segment (which was at TUNNEL_SEGMENT_LENGTH) to 0, which
+            # is where the previous segment started
+            self.tunnel[0].setZ(0)
+            # Reparent the front to render to preserve the hierarchy outlined above
+            self.tunnel[0].reparentTo(render)
+            # Set the scale to be apropriate (since attributes like scale are
+            # inherited, the rest of the segments have a scale of 1)
+            self.tunnel[0].setScale(.155, .155, .305)
+            # Set the new back to the values that the rest of the segments have
+            self.tunnel[3].reparentTo(self.tunnel[2])
+            self.tunnel[3].setZ(-TUNNEL_SEGMENT_LENGTH)
+            self.tunnel[3].setScale(1)
+
+            # Set up the tunnel to move one segment and then call contTunnel again
+            # to make the tunnel move infinitely
+            self.tunnelMove = Sequence(
+                LerpFunc(self.tunnel[0].setZ,
+                        duration=TUNNEL_TIME,
+                        fromData=0,
+                        toData=TUNNEL_SEGMENT_LENGTH * .305),
+                Func(self.contTunnel)
+            )
+            self.tunnelMove.start()
+
+ 
+
     def start_a_presentation(self):
 
         print("start")
@@ -254,7 +284,6 @@ class MouseTunnel(ShowBase):
             self.dr2.setDimensions(0.5, 0.9, 0.5, 0.8)
             self.imagesTexture.play()
         
-    
     def stop_a_presentation(self):
         if self.stim_started==True:
             self.dr2.setDimensions(0,0.1,0,0.1)
@@ -297,13 +326,71 @@ class MouseTunnel(ShowBase):
         # put a TTL on a line to indicate that a reward was given
         pass # not yet implemented
 
+    def autoLoop2(self, task):
+        dt = globalClock.getDt()
+        current_time = globalClock.getFrameTime()
+
+        self.x.extend([self.auto_position_on_track])
+        self.t.extend([globalClock.getFrameTime()])
+
+        if self.auto_presentation:
+            self.auto_running = False      
+            if self.in_waiting_period: 
+                self.time_waited+=dt
+            else:
+                self.time_waited=0
+                self.in_waiting_period=True
+            if self.time_waited > self.wait_time: #if in cue zone,see if we have been ther for long enough
+                #start a trial
+                self.start_position=self.auto_position_on_track
+                self.start_time=current_time
+                if not self.stim_started:
+                    self.start_a_presentation()
+                    print(self.stim_duration)
+                    self.stim_started=True
+                    self.show_stimulus=True
+                else:
+                    self.stim_elapsed+=dt
+                    if self.stim_elapsed > self.stim_duration:
+                        self.show_stimulus=False
+                        self.in_reward_window=True
+                        self.stop_a_presentation()
+                        self.auto_restart = True
+                        print(self.current_number_of_segments)
+                        self.current_number_of_segments +=8
+                        self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-10,
+                                                    self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-10,
+                                                    -1)))
+                        self.contTunnel()
+                        self.time_waited=0
+                        self.looking_for_a_cue_zone = False
+                # base.setBackgroundColor([0, 0, 1])
+            else:
+                pass# base.setBackgroundColor([0, 1, 0])
+        else: 
+            self.auto_running = True
+        return Task.cont    # Since every return is Task.cont, the task will
+
     def gameLoop(self, task):
         # get the time elapsed since the next frame.  
         dt = globalClock.getDt()
         current_time = globalClock.getFrameTime()
 
         # get the camera position.
-        position_on_track = base.camera.getZ()
+        position_on_track     = base.camera.getZ()
+
+        #get the encoder position from NIDAQ Analog Inputs channel 2
+        encoder_position      = self.ai.data[0][2]  #zeroth sample in buffer [0], from ai2 [2]
+        #convert to track coordinates
+        encoder_position_diff = (encoder_position - self.previous_encoder_position)
+        if encoder_position_diff > 4.5: encoder_position_diff -= 5.
+        if encoder_position_diff < -4.5: encoder_position_diff += 5.
+        encoder_position_diff *= self.encoder_gain
+        self.previous_encoder_position = encoder_position
+        position_on_track = base.camera.getZ()+encoder_position_diff
+        #reset the camera position
+        self.camera.setPos(base.camera.getX(),base.camera.getY(),position_on_track)
+
         self.x.extend([position_on_track])
         self.t.extend([globalClock.getFrameTime()])
 
@@ -450,7 +537,7 @@ class MouseTunnel(ShowBase):
         self.last_position = position_on_track
         
         #check the lick buffer. if false alarm, abort. if not
-        self.read_licks()
+        # self.read_licks()
         
         return Task.cont    # Since every return is Task.cont, the task will
         # free run task indefinitely, under fixed conditions to demonstrate to mouse
