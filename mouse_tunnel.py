@@ -25,6 +25,7 @@ mouse_id = 'test'
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
 AUTO_MODE=False
 #AUTO_MODE=True
+auto_reward = True
 
 # Global variables for the tunnel dimensions and speed of travel
 TUNNEL_SEGMENT_LENGTH = 50
@@ -45,6 +46,7 @@ class MouseTunnel(ShowBase):
         self.accept('q', self.close)
         self.accept('Q', self.close)
 
+
         # disable mouse control so that we can place the camera
         base.disableMouse()
         camera.setPosHpr(0, 0, 10, 0, -90, 0)
@@ -63,7 +65,7 @@ class MouseTunnel(ShowBase):
         #set up the textures
         # we now get buffer thats going to hold the texture of our new scene
         altBuffer = self.win.makeTextureBuffer("hello", 1524, 1024)
-        altBuffer.getDisplayRegion(0).setDimensions(0.5,0.9,0.5,0.8)
+        # altBuffer.getDisplayRegion(0).setDimensions(0.5,0.9,0.5,0.8)
         # altBuffer = base.win.makeDisplayRegion()
         # altBuffer.makeDisplayRegion(0,1,0,1)
         
@@ -84,7 +86,7 @@ class MouseTunnel(ShowBase):
         
         self.imagesTexture=MovieTexture("image_sequence")
         # success = self.imagesTexture.read("models/natural_images.avi")
-        # success = self.imagesTexture.read("models/movie3.mp4")
+        success = self.imagesTexture.read("models/movie_5hz.mpg")
         self.imagesTexture.setPlayRate(1.0)
         self.imagesTexture.setLoopCount(10)
         # self.imageTexture =loader.loadTexture("models/NaturalImages/BSDs_8143.tiff")
@@ -266,8 +268,6 @@ class MouseTunnel(ShowBase):
             )
             self.tunnelMove.start()
 
- 
-
     def start_a_presentation(self):
 
         print("start")
@@ -292,6 +292,7 @@ class MouseTunnel(ShowBase):
             self.stim_elapsed=0.
             self.stim_duration = exponential(self.max_stim_duration)
             self.stim_off_time = globalClock.getFrameTime()
+
             self.do.WriteBit(2,0)
 
     def _lickSensorSetup(self):
@@ -572,25 +573,24 @@ class MouseTunnel(ShowBase):
                 
     def rewardControl(self,task):
         pass
-        # lick=False
-        # if self.in_reward_window:
-        #     self.reward_elapsed+=globalClock.getDt()
-        #     if len(np.where(self.lickData > self.stim_off_time)[0]) > 1: # this checks if there has been more than zero licks since the stimulus turned off
-        #         lick=True
-        #         print(len(np.where(self.lickData > self.stim_off_time)[0]))
-        #         print(self.lickData)
-        #     if lick:
-        #         self._give_reward()
-        #         self.in_reward_window=False
-        #         # self.reward_elapsed=0.
-        #         # base.setBackgroundColor([1, 1, 0])
+        if self.in_reward_window:
+            self.reward_elapsed+=globalClock.getDt()
+            if not auto_reward:
+                if len(np.where(np.array(self.lickData) > self.stim_off_time)[0]) > 1: # this checks if there has been more than zero licks since the stimulus turned off
+                    self._give_reward(self.reward_volume)
+                    self.in_reward_window=False
+            else:
+                self._give_reward(self.reward_volume)
+                self.in_reward_window=False
+                # self.reward_elapsed=0.
+                # base.setBackgroundColor([1, 1, 0])
 
         # if self.keys[key.NUM_1]:
         #     print('reward!')
 
-        # if self.reward_elapsed > self.reward_window:
-        #     self.in_reward_window=False
-        #     self.reward_elapsed=0.
+        if self.reward_elapsed > self.reward_window:
+            self.in_reward_window=False
+            self.reward_elapsed=0.
         return Task.cont
     
     def _setupDAQ(self):
