@@ -640,12 +640,14 @@ class MouseTunnel(ShowBase):
                                                     str(self.session_start_time.second))
         if ~os.path.isdir(save_path):
             os.mkdir(save_path)
+                
+        print("saving data to "+save_path)
         np.save(os.path.join(save_path,'licks.npy'),self.lickData)
         np.save(os.path.join(save_path,'x.npy'),self.x)
         np.save(os.path.join(save_path,'t.npy'),self.t)
         np.save(os.path.join(save_path,'trialData.npy'),self.trialData)
         np.save(os.path.join(save_path,'rewardData.npy'),self.rewardData)
-        sys.exit  
+        sys.exit(0) 
 
     
 
