@@ -281,7 +281,7 @@ class MouseTunnel(ShowBase):
                 self.card.setTexture(self.imageTextures[i],1)
         if self.stimtype=='image_sequence':
             self.imagesTexture.setTime(0.)
-            self.dr2.setDimensions(0.5, 0.9, 0.5, 0.8)
+            self.dr2.setDimensions(0.4, 0.8, 0.4, 0.70) #floats (left, right, bottom, top)
             self.imagesTexture.play()
         
     def stop_a_presentation(self):
@@ -358,8 +358,8 @@ class MouseTunnel(ShowBase):
                         self.auto_restart = True
                         print(self.current_number_of_segments)
                         self.current_number_of_segments +=8
-                        self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-10,
-                                                    self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-10,
+                        self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-40,
+                                                    self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-40,
                                                     -1)))
                         self.contTunnel()
                         self.time_waited=0
@@ -446,7 +446,7 @@ class MouseTunnel(ShowBase):
             x = self.current_number_of_segments
             if x%8 == 0:
                 self.tunnel[x] = loader.loadModel('models/grating')
-                self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-10,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-10,-1)))
+                self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-40,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-40,-1)))
             else:
                 self.tunnel[x] = loader.loadModel('models/tunnel')
             self.tunnel[x].setPos(0, 0, -TUNNEL_SEGMENT_LENGTH)
@@ -524,7 +524,7 @@ class MouseTunnel(ShowBase):
             x = self.current_number_of_segments
             if x%8 == 0:
                 self.tunnel[x] = loader.loadModel('models/grating')
-                self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-10,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-10,-1)))
+                self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-40,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-40,-1)))
             else:
                 self.tunnel[x] = loader.loadModel('models/tunnel')
             self.tunnel[x].setPos(0, 0, -TUNNEL_SEGMENT_LENGTH)
