@@ -56,7 +56,7 @@ class MouseTunnel(ShowBase):
         # base.enableMouse()
         
         props = WindowProperties()
-        props.setFullscreen(True)
+        # props.setFullscreen(True)
         props.setCursorHidden(True)
         props.setMouseMode(WindowProperties.M_relative)
         base.win.requestProperties(props)
