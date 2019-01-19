@@ -19,13 +19,13 @@ try:
 except:# Exception, e:
     print("could not import iodaq.")
 
-mouse_id = 'test'
+MOUSE_ID = '412813'
 
 #this is used to change whether the mouse's running and licking control the rewards.
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
-AUTO_MODE=False
-#AUTO_MODE=True
-auto_reward = True
+# AUTO_MODE=False
+AUTO_MODE= True
+AUTO_REWARD = True
 
 # Global variables for the tunnel dimensions and speed of travel
 TUNNEL_SEGMENT_LENGTH = 50
@@ -123,9 +123,9 @@ class MouseTunnel(ShowBase):
         #for task control
         self.interval=0
         self.time_waiting_in_cue_zone=0
-        self.wait_time=1.0
+        self.wait_time=2.5
         self.stim_duration= 4.0 # in seconds
-        self.max_stim_duration = 4.0 # in seconds
+        self.max_stim_duration = 6.0 # in seconds
         self.stim_elapsed= 0.0 # in seconds
         self.last_position = base.camera.getZ()
         self.position_on_track = base.camera.getZ()
@@ -173,7 +173,8 @@ class MouseTunnel(ShowBase):
         
         if AUTO_MODE:
             self.gameTask = taskMgr.add(self.autoLoop2, "autoLoop2")
-            self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-10,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-10,-1)))
+            self.rewardTask = taskMgr.add(self.rewardControl, "reward")
+            self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-50,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-50,-1)))
             self.auto_position_on_track = 0
             self.auto_restart = False
             self.auto_running = True
@@ -218,7 +219,7 @@ class MouseTunnel(ShowBase):
     # to simulate traveling through it
     def contTunnel(self):
         self.auto_position_on_track -= 50
-        position_on_track = self.auto_position_on_track - 11
+        position_on_track = self.auto_position_on_track 
         print(str(int(position_on_track))+'   '+ str(self.cue_zone))
         if int(position_on_track) in np.array(self.cue_zone): #check for cue zone
             if not self.auto_restart:
@@ -347,7 +348,7 @@ class MouseTunnel(ShowBase):
                 self.start_time=current_time
                 if not self.stim_started:
                     self.start_a_presentation()
-                    print(self.stim_duration)
+                    # print(self.stim_duration)
                     self.stim_started=True
                     self.show_stimulus=True
                 else:
@@ -356,12 +357,17 @@ class MouseTunnel(ShowBase):
                         self.show_stimulus=False
                         self.in_reward_window=True
                         self.stop_a_presentation()
-                        self.auto_restart = True
-                        print(self.current_number_of_segments)
-                        self.current_number_of_segments +=8
-                        self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-40,
-                                                    self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-40,
-                                                    -1)))
+                        self.auto_restart = False
+                        # print(self.current_number_of_segments)
+                        self.current_number_of_segments +=9
+                        #redefine the cue zone as the next one
+                        self.cue_zone = arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-40,
+                                               self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-40,
+                                                    -1) 
+                        #extend cue zone, keeping old ones
+                        # self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-40,
+                        #                             self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-40,
+                        #                             -1)))
                         self.contTunnel()
                         self.time_waited=0
                         self.looking_for_a_cue_zone = False
@@ -396,7 +402,7 @@ class MouseTunnel(ShowBase):
         self.t.extend([globalClock.getFrameTime()])
 
         #first check if the mouse moved on the last frame.
-        if abs(self.last_position - position_on_track) < .5: #the mouse didn't move more than 0.5 units on the track
+        if abs(self.last_position - position_on_track) < 1.5: #the mouse didn't move more than 0.5 units on the track
             self.moved=False
             if int(position_on_track) in self.cue_zone: #check for cue zone
                 if self.looking_for_a_cue_zone: #make sure we transitioning from the tunnel to a cue zone
@@ -464,85 +470,6 @@ class MouseTunnel(ShowBase):
         return Task.cont    # Since every return is Task.cont, the task will
         # continue indefinitely, under control of the mouse
         
-    def autoLoop(self, task):
-        # get the time elapsed since the next frame.  
-        dt = globalClock.getDt()
-        current_time = globalClock.getFrameTime()
-
-        # get the camera position.
-        self.position_on_track += 1
-        position_on_track = self.position_on_track
-        #first check if the mouse moved on the last frame.
-        if abs(self.last_position - position_on_track) < .5: #the mouse didn't move more than 0.5 units on the track
-            self.moved=False
-            if int(position_on_track) in self.cue_zone: #check for cue zone
-                if self.looking_for_a_cue_zone: #make sure we transitioning from the tunnel to a cue zone
-                    #increment how long we've been waiting in the cue zone. 
-                    if self.in_waiting_period: 
-                        self.time_waited+=dt
-                    else:
-                        self.time_waited=0
-                        self.in_waiting_period=True
-                    if self.time_waited > self.wait_time: #if in cue zone,see if we have been there for long enough
-                        #start a trial
-                        self.start_position=position_on_track
-                        self.start_time=current_time
-                        if not self.stim_started:
-                            self.start_a_presentation()
-                            print(self.stim_duration)
-                            self.stim_started=True
-                            self.show_stimulus=True
-                        else:
-                            self.stim_elapsed+=dt
-                            if self.stim_elapsed > self.stim_duration:
-                                self.show_stimulus=False
-                                self.in_reward_window=True
-                                self.stop_a_presentation()
-                                self.time_waited=0
-                                self.looking_for_a_cue_zone = False
-                                self.check_licks()
-                        # base.setBackgroundColor([0, 0, 1])
-                    else:
-                        pass# base.setBackgroundColor([0, 1, 0])
-            else:
-                self.in_waiting_period=False
-                # base.setBackgroundColor([1,0 , 0])
-                if self.looking_for_a_cue_zone == False:
-                    self.looking_for_a_cue_zone = True
-                if self.stim_started==True:
-                    self.stop_a_presentation()    
-        else: #the mouse did move
-            self.moved=True
-            if self.stim_started==True: #check if it moved during a presenation
-                self.stop_a_presentation()
-                self.time_waited=0
-                self.looking_for_a_cue_zone = False
-                self.show_stimulus=False
-        
-        #if we need to add another segment, do so
-        if position_on_track < self.boundary_to_add_next_segment:
-            self.tunnel.extend([None])
-            x = self.current_number_of_segments
-            if x%8 == 0:
-                self.tunnel[x] = loader.loadModel('models/grating')
-                self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-40,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-40,-1)))
-            else:
-                self.tunnel[x] = loader.loadModel('models/tunnel')
-            self.tunnel[x].setPos(0, 0, -TUNNEL_SEGMENT_LENGTH)
-            self.tunnel[x].reparentTo(self.tunnel[x - 1])
-            #increment
-            self.boundary_to_add_next_segment -= TUNNEL_SEGMENT_LENGTH
-            self.current_number_of_segments+=1
-        else: pass#print('current:'+str(position_on_track) +'      next boundary:' + str(self.boundary_to_add_next_segment))
-
-        self.last_position = position_on_track
-        
-        #check the lick buffer. if false alarm, abort. if not
-        # self.read_licks()
-        
-        return Task.cont    # Since every return is Task.cont, the task will
-        # free run task indefinitely, under fixed conditions to demonstrate to mouse
-        
     def stimulusControl(self,task):
         if self.show_stimulus and not self.bufferViewer.isEnabled():
             # self.bufferViewer.toggleEnable()
@@ -572,10 +499,9 @@ class MouseTunnel(ShowBase):
         return Task.cont
                 
     def rewardControl(self,task):
-        pass
         if self.in_reward_window:
             self.reward_elapsed+=globalClock.getDt()
-            if not auto_reward:
+            if not AUTO_REWARD:
                 if len(np.where(np.array(self.lickData) > self.stim_off_time)[0]) > 1: # this checks if there has been more than zero licks since the stimulus turned off
                     self._give_reward(self.reward_volume)
                     self.in_reward_window=False
@@ -631,7 +557,7 @@ class MouseTunnel(ShowBase):
             self.ao = None
 
     def close(self):
-        save_path = os.path.join(os.getcwd(),'data',str(mouse_id)+'_'+\
+        save_path = os.path.join(os.getcwd(),'data',str(MOUSE_ID)+'_'+\
                                                     str(self.session_start_time.year)+'_'+\
                                                     str(self.session_start_time.month)+'_'+\
                                                     str(self.session_start_time.day)+'-'+\
@@ -647,9 +573,12 @@ class MouseTunnel(ShowBase):
         np.save(os.path.join(save_path,'t.npy'),self.t)
         np.save(os.path.join(save_path,'trialData.npy'),self.trialData)
         np.save(os.path.join(save_path,'rewardData.npy'),self.rewardData)
+
+        print('rewardData:')
+        print(np.shape(self.rewardData))
         sys.exit(0) 
 
-    
+
 
 
 app = MouseTunnel()
