@@ -292,7 +292,7 @@ class MouseTunnel(ShowBase):
             self.stim_started=False
             self.stim_elapsed=0.
             self.stim_duration = 0.
-            while self.stim_duration < 1. or self.stim_duration > self.max_stim_duration *2.> :
+            while self.stim_duration < 1. or self.stim_duration > self.max_stim_duration *2.:# set some limits on the random duration so is not too short or too long 
                 self.stim_duration = exponential(self.max_stim_duration)
             self.stim_off_time = globalClock.getFrameTime()
 

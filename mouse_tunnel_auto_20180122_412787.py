@@ -123,7 +123,7 @@ class MouseTunnel(ShowBase):
         #for task control
         self.interval=0
         self.time_waiting_in_cue_zone=0
-        self.wait_time=1.83
+        self.wait_time=1.0
         self.stim_duration= 4.0 # in seconds
         self.max_stim_duration = 6.0 # in seconds
         self.stim_elapsed= 0.0 # in seconds
@@ -174,7 +174,7 @@ class MouseTunnel(ShowBase):
         if AUTO_MODE:
             self.gameTask = taskMgr.add(self.autoLoop2, "autoLoop2")
             self.rewardTask = taskMgr.add(self.rewardControl, "reward")
-            self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-50,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-50,-1)))
+            self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-10,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-10,-1)))
             self.auto_position_on_track = 0
             self.auto_restart = False
             self.auto_running = True
@@ -291,9 +291,7 @@ class MouseTunnel(ShowBase):
             # self.bufferViewer.toggleEnable()
             self.stim_started=False
             self.stim_elapsed=0.
-            self.stim_duration = 0.
-            while self.stim_duration < 1. or self.stim_duration > self.max_stim_duration *2.> :
-                self.stim_duration = exponential(self.max_stim_duration)
+            self.stim_duration = exponential(self.max_stim_duration)
             self.stim_off_time = globalClock.getFrameTime()
 
             self.do.WriteBit(2,0)
@@ -404,7 +402,7 @@ class MouseTunnel(ShowBase):
         self.t.extend([globalClock.getFrameTime()])
 
         #first check if the mouse moved on the last frame.
-        if abs(self.last_position - position_on_track) < 1.5: #the mouse didn't move more than 0.5 units on the track
+        if abs(self.last_position - position_on_track) < .5: #the mouse didn't move more than 0.5 units on the track
             self.moved=False
             if int(position_on_track) in self.cue_zone: #check for cue zone
                 if self.looking_for_a_cue_zone: #make sure we transitioning from the tunnel to a cue zone

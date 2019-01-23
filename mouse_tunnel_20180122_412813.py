@@ -19,12 +19,12 @@ try:
 except:# Exception, e:
     print("could not import iodaq.")
 
-MOUSE_ID = '412787'
+MOUSE_ID = '412813'
 
 #this is used to change whether the mouse's running and licking control the rewards.
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
 # AUTO_MODE=False
-AUTO_MODE= False
+AUTO_MODE= True
 AUTO_REWARD = True
 
 # Global variables for the tunnel dimensions and speed of travel
@@ -123,7 +123,7 @@ class MouseTunnel(ShowBase):
         #for task control
         self.interval=0
         self.time_waiting_in_cue_zone=0
-        self.wait_time=1.83
+        self.wait_time=2.5
         self.stim_duration= 4.0 # in seconds
         self.max_stim_duration = 6.0 # in seconds
         self.stim_elapsed= 0.0 # in seconds
@@ -291,9 +291,7 @@ class MouseTunnel(ShowBase):
             # self.bufferViewer.toggleEnable()
             self.stim_started=False
             self.stim_elapsed=0.
-            self.stim_duration = 0.
-            while self.stim_duration < 1. or self.stim_duration > self.max_stim_duration *2.> :
-                self.stim_duration = exponential(self.max_stim_duration)
+            self.stim_duration = exponential(self.max_stim_duration)
             self.stim_off_time = globalClock.getFrameTime()
 
             self.do.WriteBit(2,0)
