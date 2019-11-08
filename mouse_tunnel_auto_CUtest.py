@@ -16,10 +16,13 @@ from pyglet.window import key
 
 try:
     from toolbox.toolbox.IO.nidaq import DigitalInput,DigitalOutput, AnalogInput, AnalogOutput
+    have_nidaq=True
 except:# Exception, e:
     print("could not import iodaq.")
+    have_nidaq=False
 
-MOUSE_ID = '412814'
+
+MOUSE_ID = 'test'
 
 #this is used to change whether the mouse's running and licking control the rewards.
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
@@ -46,14 +49,14 @@ class MouseTunnel(ShowBase):
         self.accept('q', self.close)
         self.accept('Q', self.close)
 
-
+        self.AUTO_REWARD = AUTO_REWARD
         # disable mouse control so that we can place the camera
         base.disableMouse()
         camera.setPosHpr(0, 0, 10, 0, -90, 0)
         mat=Mat4(camera.getMat())
         mat.invertInPlace()
         base.mouseInterfaceNode.setMat(mat)
-        base.enableMouse()
+        # base.enableMouse()
         
         props = WindowProperties()
         # props.setFullscreen(True)
@@ -123,7 +126,7 @@ class MouseTunnel(ShowBase):
         #for task control
         self.interval=0
         self.time_waiting_in_cue_zone=0
-        self.wait_time=2.5
+        self.wait_time=1.83
         self.stim_duration= 4.0 # in seconds
         self.max_stim_duration = 6.0 # in seconds
         self.stim_elapsed= 0.0 # in seconds
@@ -166,6 +169,7 @@ class MouseTunnel(ShowBase):
         #INITIALIZE KEY SENSOR, for backup inputs and other user controls
         self.keys = key.KeyStateHandler()
         self.accept('r', self._give_reward, [self.reward_volume])
+        self.accept('l', self._toggle_reward)
 
         img_list = glob.glob('models/NaturalImages/*.tiff')[:10]
         print(img_list)
@@ -174,7 +178,10 @@ class MouseTunnel(ShowBase):
         if AUTO_MODE:
             self.gameTask = taskMgr.add(self.autoLoop2, "autoLoop2")
             self.rewardTask = taskMgr.add(self.rewardControl, "reward")
-            self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-50,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-50,-1)))
+            self.cue_zone = concatenate((self.cue_zone,arange(\
+                self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH,\
+                self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-80,\
+                -1)))
             self.auto_position_on_track = 0
             self.auto_restart = False
             self.auto_running = True
@@ -291,7 +298,9 @@ class MouseTunnel(ShowBase):
             # self.bufferViewer.toggleEnable()
             self.stim_started=False
             self.stim_elapsed=0.
-            self.stim_duration = exponential(self.max_stim_duration)
+            self.stim_duration = 0.
+            while self.stim_duration < 1. or self.stim_duration > self.max_stim_duration *2.:# set some limits on the random duration so is not too short or too long 
+                self.stim_duration = exponential(self.max_stim_duration)
             self.stim_off_time = globalClock.getFrameTime()
 
             self.do.WriteBit(2,0)
@@ -324,9 +333,16 @@ class MouseTunnel(ShowBase):
         self.rewardData.extend([globalClock.getFrameTime()])
         self.do.WriteBit(3,0)
         time.sleep(self.reward_time)
-        self.do.WriteBit(3,1)
-        # put a TTL on a line to indicate that a reward was given
+        self.do.WriteBit(3,1) # put a TTL on a line to indicate that a reward was given
         pass # not yet implemented
+
+    def _toggle_reward(self):
+        if self.AUTO_REWARD:
+            self.AUTO_REWARD = False
+            print('switched to lick sensing for reward.')
+        else:
+            self.AUTO_REWARD = True
+            print('switched to automatic rewards after stimuli.')
 
     def autoLoop2(self, task):
         dt = globalClock.getDt()
@@ -361,8 +377,8 @@ class MouseTunnel(ShowBase):
                         # print(self.current_number_of_segments)
                         self.current_number_of_segments +=9
                         #redefine the cue zone as the next one
-                        self.cue_zone = arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-40,
-                                               self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-40,
+                        self.cue_zone = arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH,
+                                               self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-80,
                                                     -1) 
                         #extend cue zone, keeping old ones
                         # self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-40,
@@ -453,7 +469,10 @@ class MouseTunnel(ShowBase):
             x = self.current_number_of_segments
             if x%8 == 0:
                 self.tunnel[x] = loader.loadModel('models/grating')
-                self.cue_zone = concatenate((self.cue_zone,arange(self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-40,self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-40,-1)))
+                self.cue_zone = concatenate((self.cue_zone,arange(\
+                    self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH,\
+                    self.current_number_of_segments*-TUNNEL_SEGMENT_LENGTH-TUNNEL_SEGMENT_LENGTH-80,\
+                    -1)))
             else:
                 self.tunnel[x] = loader.loadModel('models/tunnel')
             self.tunnel[x].setPos(0, 0, -TUNNEL_SEGMENT_LENGTH)
@@ -501,13 +520,17 @@ class MouseTunnel(ShowBase):
     def rewardControl(self,task):
         if self.in_reward_window:
             self.reward_elapsed+=globalClock.getDt()
-            if not AUTO_REWARD:
-                if len(np.where(np.array(self.lickData) > self.stim_off_time)[0]) > 1: # this checks if there has been more than zero licks since the stimulus turned off
-                    self._give_reward(self.reward_volume)
+            if not self.AUTO_REWARD:
+                if self.reward_elapsed < self.reward_window:
+                    if len(np.where(np.array(self.lickData) > self.stim_off_time)[0]) > 1: # this checks if there has been more than zero licks since the stimulus turned off
+                        self._give_reward(self.reward_volume)
+                        self.in_reward_window=False;self.reward_elapsed=0.#reset
+                else:
                     self.in_reward_window=False
+                    self.reward_elapsed=0.#reset
             else:
                 self._give_reward(self.reward_volume)
-                self.in_reward_window=False
+                self.in_reward_window=False;self.reward_elapsed=0.#reset
                 # self.reward_elapsed=0.
                 # base.setBackgroundColor([1, 1, 0])
 
@@ -541,15 +564,15 @@ class MouseTunnel(ShowBase):
             self.di = None
         try:
             #set up 8 channels, only use 2 though for now
-            self.ai = AnalogInput(self.nidevice, range(8), buffer_size=25,
-                                  clock_speed=6000.0)
+            self.ai = AnalogInput('Dev1', range(8), buffer_size=25,terminal_config = 'Diff',
+                                  clock_speed=6000.0,voltage_range=[-5.0,5.0])
             self.ai.StartTask()
         except:# Exception, e:
             print("Error starting AnalogInput task:")
             self.ai = None
 
         try:
-            self.ao = AnalogOutput(self.nidevice, channels=[0, 1],
+            self.ao = AnalogOutput(self.nidevice, channels=[0, 1],terminal_config = 'Diff',
                                    voltage_range=[0.0, 5.0])
             self.ao.StartTask()
         except:# Exception, e:
