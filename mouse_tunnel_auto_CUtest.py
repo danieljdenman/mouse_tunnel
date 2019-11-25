@@ -141,9 +141,9 @@ class MouseTunnel(ShowBase):
 
         
         #INITIALIZE NIDAQ
-        self.nidevice = 'Dev1'
-        self.encodervinchannel = 0
-        self.encodervsigchannel = 1
+        self.nidevice = 'Dev2'
+        self.encodervinchannel = 1
+        self.encodervsigchannel = 0
         self.invertdo = False
         self.diport = 1
         self.lickline = 1
@@ -153,7 +153,7 @@ class MouseTunnel(ShowBase):
         self._setupDAQ()
         self.do.WriteBit(1,1)
         self.do.WriteBit(3,1)#set reward high, because the logic is flipped somehow. possibly by haphazard wiring of the circuit (12/24/2018 djd)
-        self.previous_encoder_position = self.ai.data[0][2]
+        self.previous_encoder_position = self.ai.data[0][self.encodervsigchannel]
         self.encoder_gain = -20
 
         #INITIALIZE LICK SENSOR
@@ -319,6 +319,7 @@ class MouseTunnel(ShowBase):
                 self.lickSensor = None
                 self.lickData = [np.zeros(len(self.rewardlines))]
                 print("Lick sensor failed startup test.")
+            self.keycontrol = True
         else:
             print("Could not initialize lick sensor.  Ensure that NIDAQ is connected properly.")
             self.keycontrol = True
@@ -403,7 +404,7 @@ class MouseTunnel(ShowBase):
         position_on_track     = base.camera.getZ()
 
         #get the encoder position from NIDAQ Analog Inputs channel 2
-        encoder_position      = self.ai.data[0][2]  #zeroth sample in buffer [0], from ai2 [2]
+        encoder_position      = self.ai.data[0][self.encodervsigchannel]  #zeroth sample in buffer [0], from ai2 [2]
         #convert to track coordinates
         encoder_position_diff = (encoder_position - self.previous_encoder_position)
         if encoder_position_diff > 4.5: encoder_position_diff -= 5.
@@ -562,17 +563,17 @@ class MouseTunnel(ShowBase):
         except:# Exception, e:
             print("Error starting DigitalInput task:")
             self.di = None
-        try:
+        # try:
             #set up 8 channels, only use 2 though for now
-            self.ai = AnalogInput('Dev1', range(8), buffer_size=25,terminal_config = 'Diff',
-                                  clock_speed=6000.0,voltage_range=[-5.0,5.0])
-            self.ai.StartTask()
-        except:# Exception, e:
-            print("Error starting AnalogInput task:")
-            self.ai = None
+        self.ai = AnalogInput(self.nidevice, range(8), buffer_size=25,terminal_config = 'RSE',
+                                clock_speed=6000.0,voltage_range=[-5.0,5.0])
+        self.ai.StartTask()
+        # except:# Exception, e:
+        # print("Error starting AnalogInput task:")
+        # self.ai = None
 
         try:
-            self.ao = AnalogOutput(self.nidevice, channels=[0, 1],terminal_config = 'Diff',
+            self.ao = AnalogOutput(self.nidevice, channels=[0, 1],terminal_config = 'RSE',
                                    voltage_range=[0.0, 5.0])
             self.ao.StartTask()
         except:# Exception, e:
