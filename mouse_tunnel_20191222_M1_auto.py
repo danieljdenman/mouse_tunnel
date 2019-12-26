@@ -26,12 +26,12 @@ from stepper import Stepper
 import time
 s = Stepper(mode='arduino',port='COM3',syringe='3mL')
 
-MOUSE_ID = 'test'
+MOUSE_ID = 'm1'
 
 #this is used to change whether the mouse's running and licking control the rewards.
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
 # AUTO_MODE=False
-AUTO_MODE= False
+AUTO_MODE= True
 AUTO_REWARD = True
 
 # Global variables for the tunnel dimensions and speed of travel
