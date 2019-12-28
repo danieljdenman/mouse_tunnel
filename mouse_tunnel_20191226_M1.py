@@ -49,7 +49,7 @@ class MouseTunnel(ShowBase):
         #session_start
         self.session_start_time = datetime.datetime.now()
 
-        self.accept("escape", sys.exit, [0])
+        # self.accept("escape", sys.exit, [0])#don't let the user do this, because then the data isn't saved.
         self.accept('q', self.close)
         self.accept('Q', self.close)
 
@@ -180,6 +180,9 @@ class MouseTunnel(ShowBase):
         print(img_list)
         self.imageTextures =[loader.loadTexture(img) for img in img_list]
         
+        self._setupEyetracking()
+        self._startEyetracking()
+
         if AUTO_MODE:
             self.gameTask = taskMgr.add(self.autoLoop2, "autoLoop2")
             self.rewardTask = taskMgr.add(self.rewardControl, "reward")
@@ -548,7 +551,29 @@ class MouseTunnel(ShowBase):
             self.in_reward_window=False
             self.reward_elapsed=0.
         return Task.cont
-    
+
+    def _setupEyetracking(self):
+        """ sets up eye tracking"""
+        try:
+            eyetrackerip = "DESKTOP-EE5KKDO"
+            eyetrackerport = 10000
+            trackeyepos = False
+            from aibs.Eyetracking.EyetrackerClient import Client
+            self.eyetracker = Client(outgoing_ip=eyetrackerip,
+                                        outgoing_port=eyetrackerport,
+                                        output_filename=str(datetime.datetime.now()).replace(':','').replace('.','').replace(' ','-'))
+            self.eyetracker.setup()
+            # eyedatalog = []
+            # if trackeyepos:
+            #     eyeinitpos = None
+        except:
+            print("Could not initialize eyetracker:")
+            self.eyetracker = None    
+
+    def _startEyetracking(self):
+        if self.eyetracker:
+            self.eyetracker.recordStart()
+
     def _setupDAQ(self):
         """ Sets up some digital IO for sync and tiggering. """
         print('SETTING UP DAQ')
@@ -587,6 +612,10 @@ class MouseTunnel(ShowBase):
             self.ao = None
 
     def close(self):
+        if self.eyetracker:
+            self.eyetracker.recordStop()
+            print('stop eyetracking')
+
         save_path = os.path.join(os.getcwd(),'data',str(MOUSE_ID)+'_'+\
                                                     str(self.session_start_time.year)+'_'+\
                                                     str(self.session_start_time.month)+'_'+\
@@ -607,6 +636,8 @@ class MouseTunnel(ShowBase):
         print('rewardData:')
         print(np.shape(self.rewardData))
         sys.exit(0) 
+
+
 
 
 
