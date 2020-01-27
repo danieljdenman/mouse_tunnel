@@ -29,7 +29,10 @@ s = Stepper(mode='arduino',port='COM3',syringe='3mL')
 
 MOUSE_ID = 'm1'
 REWARD_VOLUME= 10 #in µL
+REWARD_WINDOW = 1.0 #in seconds
+
 getopt.getopt(args, options, [long_options])
+
 try:
     opts, args = getopt.getopt(argv,"hi:o:",["mouse_id=","reward_volume="])
 except getopt.GetoptError:
@@ -156,10 +159,10 @@ class MouseTunnel(ShowBase):
         self.last_position = base.camera.getZ()
         self.position_on_track = base.camera.getZ()
         #for reward control
-        self.reward_window = 1.0 # in seconds
+        self.reward_window = REWARD_WINDOW # in seconds
         self.reward_elapsed = 0.0
         # self.reward_volume = 0.008 # in mL. this is for the hardcoded 0.1 seconds of reward time
-        self.reward_volume = REWARD_VOLUME # in uL, for the stepper motor
+        self.reward_volume = int(REWARD_VOLUME) # in uL, for the stepper motor
         self.reward_time = 0.1 # in sec, based on volume. hard coded right now but should be modified by the (1) calibration and (2) optionally by the main loop for dynamic reward scheduling
         # self.lick_buffer = []
 

@@ -7,7 +7,7 @@ from direct.interval.LerpInterval import LerpFunc
 from direct.interval.FunctionInterval import Func
 from panda3d.core import Mat4, WindowProperties, CardMaker, NodePath, TextureStage, MovieTexture, MovieVideo
 
-import sys,glob,time,datetime,os, getopt
+import sys,glob,time,datetime,os
 from math import pi, sin, cos
 from numpy.random import randint, exponential
 from numpy import arange,concatenate
@@ -21,30 +21,8 @@ except:# Exception, e:
     print("could not import iodaq.")
     have_nidaq=False
 
-sys.path.append('C:\github\syringe_pump')
-from stepper import Stepper
-import time
-s = Stepper(mode='arduino',port='COM3',syringe='3mL')
 
-
-MOUSE_ID = 'm1'
-REWARD_VOLUME= 10 #in µL
-getopt.getopt(args, options, [long_options])
-try:
-    opts, args = getopt.getopt(argv,"hi:o:",["mouse_id=","reward_volume="])
-except getopt.GetoptError:
-    print 'test.py -i <inputfile> -o <outputfile>'
-    sys.exit(2)
-for opt, arg in opts:
-    if opt == '-h':
-        print 'test.py -i <inputfile> -o <outputfile>'
-        sys.exit()
-    elif opt in ("-id", "--mouse_id"):
-        MOUSE_ID = arg
-    elif opt in ("-v", "--reward_volume"):
-        REWARD_VOLUME = arg
-
-
+MOUSE_ID = 'test'
 
 #this is used to change whether the mouse's running and licking control the rewards.
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
@@ -67,7 +45,7 @@ class MouseTunnel(ShowBase):
         #session_start
         self.session_start_time = datetime.datetime.now()
 
-        # self.accept("escape", sys.exit, [0])#don't let the user do this, because then the data isn't saved.
+        self.accept("escape", sys.exit, [0])
         self.accept('q', self.close)
         self.accept('Q', self.close)
 
@@ -78,11 +56,10 @@ class MouseTunnel(ShowBase):
         mat=Mat4(camera.getMat())
         mat.invertInPlace()
         base.mouseInterfaceNode.setMat(mat)
-        # base.enableMouse()
+        base.enableMouse()
         
         props = WindowProperties()
-        props.setOrigin(1920,0)
-        props.setFullscreen(True)
+        # props.setFullscreen(True)
         props.setCursorHidden(True)
         props.setMouseMode(WindowProperties.M_relative)
         base.win.requestProperties(props)
@@ -158,8 +135,7 @@ class MouseTunnel(ShowBase):
         #for reward control
         self.reward_window = 1.0 # in seconds
         self.reward_elapsed = 0.0
-        # self.reward_volume = 0.008 # in mL. this is for the hardcoded 0.1 seconds of reward time
-        self.reward_volume = REWARD_VOLUME # in uL, for the stepper motor
+        self.reward_volume = 0.008 # in mL. this is for the hardcoded 0.1 seconds of reward time
         self.reward_time = 0.1 # in sec, based on volume. hard coded right now but should be modified by the (1) calibration and (2) optionally by the main loop for dynamic reward scheduling
         # self.lick_buffer = []
 
@@ -175,10 +151,11 @@ class MouseTunnel(ShowBase):
         self.rewardline = 0
         self.rewardlines = [0]
         self._setupDAQ()
-        self.do.WriteBit(1,1)
-        self.do.WriteBit(3,1)#set reward high, because the logic is flipped somehow. possibly by haphazard wiring of the circuit (12/24/2018 djd)
-        self.previous_encoder_position = self.ai.data[0][self.encodervsigchannel]
-        self.encoder_gain = -10
+        if have_nidaq:
+            self.do.WriteBit(1,1)
+            self.do.WriteBit(3,1)#set reward high, because the logic is flipped somehow. possibly by haphazard wiring of the circuit (12/24/2018 djd)
+            self.previous_encoder_position = self.ai.data[0][self.encodervsigchannel]
+        self.encoder_gain = -20
 
         #INITIALIZE LICK SENSOR
         self._lickSensorSetup()
@@ -199,9 +176,6 @@ class MouseTunnel(ShowBase):
         print(img_list)
         self.imageTextures =[loader.loadTexture(img) for img in img_list]
         
-        self._setupEyetracking()
-        self._startEyetracking()
-
         if AUTO_MODE:
             self.gameTask = taskMgr.add(self.autoLoop2, "autoLoop2")
             self.rewardTask = taskMgr.add(self.rewardControl, "reward")
@@ -346,7 +320,6 @@ class MouseTunnel(ShowBase):
                 self.lickSensor = None
                 self.lickData = [np.zeros(len(self.rewardlines))]
                 print("Lick sensor failed startup test.")
-            else: print('lick sensor setup succeeded.')
             self.keycontrol = True
         else:
             print("Could not initialize lick sensor.  Ensure that NIDAQ is connected properly.")
@@ -363,7 +336,7 @@ class MouseTunnel(ShowBase):
         self.do.WriteBit(3,0)
         time.sleep(self.reward_time)
         self.do.WriteBit(3,1) # put a TTL on a line to indicate that a reward was given
-        s.dispense(volume)#pass # not yet implemented
+        pass # not yet implemented
 
     def _toggle_reward(self):
         if self.AUTO_REWARD:
@@ -432,11 +405,16 @@ class MouseTunnel(ShowBase):
         position_on_track     = base.camera.getZ()
 
         #get the encoder position from NIDAQ Analog Inputs channel 2
-        encoder_position      = self.ai.data[0][self.encodervsigchannel]  #zeroth sample in buffer [0], from ai2 [2]
+        if have_nidaq:
+            encoder_position      = self.ai.data[0][self.encodervsigchannel]  #zeroth sample in buffer [0], from ai2 [2]
+        else: 
+            encoder_position = base.mouseWatcherNode.getMouseX()
+            
+        self.previous_encoder_position = encoder_position
         #convert to track coordinates
         encoder_position_diff = (encoder_position - self.previous_encoder_position)
-        if encoder_position_diff > 4.5: encoder_position_diff -= 5.
-        if encoder_position_diff < -4.5: encoder_position_diff += 5.
+        # if encoder_position_diff > 4.5: encoder_position_diff -= 5.
+        # if encoder_position_diff < -4.5: encoder_position_diff += 5.
         encoder_position_diff *= self.encoder_gain
         self.previous_encoder_position = encoder_position
         position_on_track = base.camera.getZ()+encoder_position_diff
@@ -516,7 +494,7 @@ class MouseTunnel(ShowBase):
         # lick_times = self.
         # self._read_licks()
         return Task.cont    # Since every return is Task.cont, the task will
-        # continue indefinitely, under control of the mouse (animal)
+        # continue indefinitely, under control of the mouse
         
     def stimulusControl(self,task):
         if self.show_stimulus and not self.bufferViewer.isEnabled():
@@ -533,7 +511,7 @@ class MouseTunnel(ShowBase):
         if self.lickSensor:
             if self.lickSensor.Read()[self.lickline]:
                 self.lickData.extend([globalClock.getFrameTime()])
-                print('lick happened at: '+str(self.lickData[-1]))
+                # print(self.lickData)
         elif self.keycontrol == True: #NO NI BOARD.  KEY INPUT?
             if self.keys[key.SPACE]:
                 data = [globalClock.getFrameTime()]
@@ -570,29 +548,7 @@ class MouseTunnel(ShowBase):
             self.in_reward_window=False
             self.reward_elapsed=0.
         return Task.cont
-
-    def _setupEyetracking(self):
-        """ sets up eye tracking"""
-        try:
-            eyetrackerip = "DESKTOP-EE5KKDO"
-            eyetrackerport = 10000
-            trackeyepos = False
-            from aibs.Eyetracking.EyetrackerClient import Client
-            self.eyetracker = Client(outgoing_ip=eyetrackerip,
-                                        outgoing_port=eyetrackerport,
-                                        output_filename=str(datetime.datetime.now()).replace(':','').replace('.','').replace(' ','-'))
-            self.eyetracker.setup()
-            # eyedatalog = []
-            # if trackeyepos:
-            #     eyeinitpos = None
-        except:
-            print("Could not initialize eyetracker:")
-            self.eyetracker = None    
-
-    def _startEyetracking(self):
-        if self.eyetracker:
-            self.eyetracker.recordStart()
-
+    
     def _setupDAQ(self):
         """ Sets up some digital IO for sync and tiggering. """
         print('SETTING UP DAQ')
@@ -613,14 +569,14 @@ class MouseTunnel(ShowBase):
         except:# Exception, e:
             print("Error starting DigitalInput task:")
             self.di = None
-        # try:
+        try:
             #set up 8 channels, only use 2 though for now
-        self.ai = AnalogInput(self.nidevice, range(8), buffer_size=25,terminal_config = 'RSE',
-                                clock_speed=6000.0,voltage_range=[-5.0,5.0])
-        self.ai.StartTask()
-        # except:# Exception, e:
-        # print("Error starting AnalogInput task:")
-        # self.ai = None
+            self.ai = AnalogInput(self.nidevice, range(8), buffer_size=25,terminal_config = 'RSE',
+                                    clock_speed=6000.0,voltage_range=[-5.0,5.0])
+            self.ai.StartTask() 
+        except:# Exception, e:
+            print("Error starting AnalogInput task:")
+            self.ai = None
 
         try:
             self.ao = AnalogOutput(self.nidevice, channels=[0, 1],terminal_config = 'RSE',
@@ -631,10 +587,6 @@ class MouseTunnel(ShowBase):
             self.ao = None
 
     def close(self):
-        if self.eyetracker:
-            self.eyetracker.recordStop()
-            print('stop eyetracking')
-
         save_path = os.path.join(os.getcwd(),'data',str(MOUSE_ID)+'_'+\
                                                     str(self.session_start_time.year)+'_'+\
                                                     str(self.session_start_time.month)+'_'+\
@@ -655,8 +607,6 @@ class MouseTunnel(ShowBase):
         print('rewardData:')
         print(np.shape(self.rewardData))
         sys.exit(0) 
-
-
 
 
 
