@@ -12,6 +12,8 @@ s = Stepper(mode='arduino',port='COM3',syringe='3mL')
 
 """
 
+volume = 500
+
 # msvcrt is a windows specific native module
 import msvcrt
 import time
@@ -54,7 +56,7 @@ while True:
         #by default, decodes via utf8
         #concatenation auto adds a space in between
         print ('retracting')
-        s.retract(10)
+        s.retract(volume)
         #break loop
 
     if x != False and x.decode() == 'q':
