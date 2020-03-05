@@ -46,7 +46,7 @@ while True:
         #by default, decodes via utf8
         #concatenation auto adds a space in between
         print ('dispensing')
-        s.dispense(10)
+        s.dispense(200)
         #break loop
 
     if x != False and x.decode() == 'f':
@@ -57,6 +57,34 @@ while True:
         #concatenation auto adds a space in between
         print ('retracting')
         s.retract(volume)
+        #break loop
+    if x != False and x.decode() == '1':
+        #we got the key!
+        #because x is a binary, we need to decode to string
+        #use the decode() which is part of the binary object
+        #by default, decodes via utf8
+        #concatenation auto adds a space in between
+        print ('retracting')
+        s.retract(1000)
+        #break loop
+    if x != False and x.decode() == '2':
+        #we got the key!
+        #because x is a binary, we need to decode to string
+        #use the decode() which is part of the binary object
+        #by default, decodes via utf8
+        #concatenation auto adds a space in between
+        print ('retracting')
+        s.retract(2000)
+        #break loop
+
+    if x != False and x.decode() == '3':
+        #we got the key!
+        #because x is a binary, we need to decode to string
+        #use the decode() which is part of the binary object
+        #by default, decodes via utf8
+        #concatenation auto adds a space in between
+        print ('retracting')
+        s.retract(3000)
         #break loop
 
     if x != False and x.decode() == 'q':

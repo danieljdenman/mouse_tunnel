@@ -31,28 +31,29 @@ MOUSE_ID = 'm1'
 REWARD_VOLUME= 10 #in µL
 REWARD_WINDOW = 1.0 #in seconds
 
-getopt.getopt(args, options, [long_options])
-
 try:
-    opts, args = getopt.getopt(argv,"hi:o:",["mouse_id=","reward_volume="])
+    opts, args = getopt.getopt(sys.argv,"hi:o:",["mouse_id=","reward_volume="])
+    print(args)
+    MOUSE_ID = args[1]
+    REWARD_VOLUME = int(args[2])
+    REWARD_WINDOW = float(args[3])
+    print(MOUSE_ID)
+    print(REWARD_VOLUME)
+    print(REWARD_WINDOW)
 except getopt.GetoptError:
-    print 'test.py -i <inputfile> -o <outputfile>'
+    print('test.py -id <inputfile> -v <outputfile>')
     sys.exit(2)
-for opt, arg in opts:
-    if opt == '-h':
-        print 'test.py -i <inputfile> -o <outputfile>'
-        sys.exit()
-    elif opt in ("-id", "--mouse_id"):
-        MOUSE_ID = arg
-    elif opt in ("-v", "--reward_volume"):
-        REWARD_VOLUME = arg
+    MOUSE_ID = 'test'
+    REWARD_VOLUME = int(10)
+    REWARD_WINDOW = float(1.0)
 
 
 
 #this is used to change whether the mouse's running and licking control the rewards.
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
-# AUTO_MODE=False
-AUTO_MODE= False
+AUTO_MODE = False
+#AUTO_MODE= True
+#AUTO_REWARD = False
 AUTO_REWARD = True
 
 # Global variables for the tunnel dimensions and speed of travel
@@ -84,8 +85,9 @@ class MouseTunnel(ShowBase):
         # base.enableMouse()
         
         props = WindowProperties()
-        props.setOrigin(1920,0)
-        props.setFullscreen(True)
+        # props.setFullscreen(True)
+        props.setOrigin(-924,70)
+        # props.setSize(1880,1040)
         props.setCursorHidden(True)
         props.setMouseMode(WindowProperties.M_relative)
         base.win.requestProperties(props)
@@ -169,11 +171,11 @@ class MouseTunnel(ShowBase):
         
         #INITIALIZE NIDAQ
         self.nidevice = 'Dev2'
-        self.encodervinchannel = 1
+        self.encodervinchannel = 1  
         self.encodervsigchannel = 0
         self.invertdo = False
         self.diport = 1
-        self.lickline = 1
+        self.lickline = 0
         self.doport = 0
         self.rewardline = 0
         self.rewardlines = [0]
@@ -181,7 +183,7 @@ class MouseTunnel(ShowBase):
         self.do.WriteBit(1,1)
         self.do.WriteBit(3,1)#set reward high, because the logic is flipped somehow. possibly by haphazard wiring of the circuit (12/24/2018 djd)
         self.previous_encoder_position = self.ai.data[0][self.encodervsigchannel]
-        self.encoder_gain = -10
+        self.encoder_gain = 30
 
         #INITIALIZE LICK SENSOR
         self._lickSensorSetup()
@@ -438,16 +440,17 @@ class MouseTunnel(ShowBase):
         encoder_position      = self.ai.data[0][self.encodervsigchannel]  #zeroth sample in buffer [0], from ai2 [2]
         #convert to track coordinates
         encoder_position_diff = (encoder_position - self.previous_encoder_position)
-        if encoder_position_diff > 4.5: encoder_position_diff -= 5.
-        if encoder_position_diff < -4.5: encoder_position_diff += 5.
-        encoder_position_diff *= self.encoder_gain
-        self.previous_encoder_position = encoder_position
-        position_on_track = base.camera.getZ()+encoder_position_diff
-        #reset the camera position
-        self.camera.setPos(base.camera.getX(),base.camera.getY(),position_on_track)
+        if abs(encoder_position_diff) > 0.025:#manually set threshold to remove encoder noise jittering the positionq
+            if encoder_position_diff > 4.5: encoder_position_diff -= 5.
+            if encoder_position_diff < -4.5: encoder_position_diff += 5.
+            encoder_position_diff *= self.encoder_gain
+            self.previous_encoder_position = encoder_position
+            position_on_track = base.camera.getZ()+encoder_position_diff
+            #reset the camera position
+            self.camera.setPos(base.camera.getX(),base.camera.getY(),position_on_track)
 
-        self.x.extend([position_on_track])
-        self.t.extend([globalClock.getFrameTime()])
+            self.x.extend([position_on_track])
+            self.t.extend([globalClock.getFrameTime()])
 
         #first check if the mouse moved on the last frame.
         if abs(self.last_position - position_on_track) < 1.5: #the mouse didn't move more than 0.5 units on the track
@@ -619,19 +622,20 @@ class MouseTunnel(ShowBase):
         # try:
             #set up 8 channels, only use 2 though for now
         self.ai = AnalogInput(self.nidevice, range(8), buffer_size=25,terminal_config = 'RSE',
-                                clock_speed=6000.0,voltage_range=[-5.0,5.0])
+            clock_speed=6000.0,voltage_range=[-5.0,5.0])
         self.ai.StartTask()
+        print(type(self.ai))
         # except:# Exception, e:
         # print("Error starting AnalogInput task:")
         # self.ai = None
 
-        try:
-            self.ao = AnalogOutput(self.nidevice, channels=[0, 1],terminal_config = 'RSE',
-                                   voltage_range=[0.0, 5.0])
-            self.ao.StartTask()
-        except:# Exception, e:
-            print("Error starting AnalogOutput task:")
-            self.ao = None
+        # try:
+        #     self.ao = AnalogOutput(self.nidevice, channels=[0, 1],terminal_config = 'RSE',
+        #                            voltage_range=[0.0, 5.0])
+        #     self.ao.StartTask()
+        # except:# Exception, e:
+        #     print("Error starting AnalogOutput task:")
+        #     self.ao = None
 
     def close(self):
         if self.eyetracker:
