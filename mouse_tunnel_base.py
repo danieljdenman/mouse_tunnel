@@ -53,8 +53,8 @@ except getopt.GetoptError:
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
 AUTO_MODE = False
 #AUTO_MODE= True
-#AUTO_REWARD = False
-AUTO_REWARD = True
+AUTO_REWARD = False
+#AUTO_REWARD = True
 
 # Global variables for the tunnel dimensions and speed of travel
 TUNNEL_SEGMENT_LENGTH = 50
