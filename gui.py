@@ -1,5 +1,5 @@
 import tkinter 
-import subprocess, shlex, os
+import subprocess, shlex
 
 def subprocess_cmd(command):
     process = subprocess.Popen(command,stdout=subprocess.PIPE, shell=True)
@@ -60,19 +60,13 @@ script = tkinter.Entry(m, text='Script Name',textvariable=script_s,
 script.grid(row=4,column=1)
 
 def button_callback():
-<<<<<<< HEAD
     print('activate panda3d;\
         #    cd C:\github\mouse_tunnel;\
-            cd '+script_path.get()+';'\
-           'python '+script.get()+' '+mouseID_s.get()+' '+rewardVolume_s.get()+' '+rewardWindow_s.get())
-=======
+        cd '+script_path.get()+';'\
+        'python '+script.get()+' '+mouseID_s.get()+' '+rewardVolume_s.get()+' '+rewardWindow_s.get())
     subprocess_cmd('activate panda3d')
-    subprocess_cmd('cd '+os.path.join('C:\\','github','mouse_tunnel'))
-    subprocess_cmd('python mouse_tunnel_base.py '+mouseID_s.get()+' '+rewardVolume_s.get()+' '+rewardWindow_s.get())
-    
-           
-           
->>>>>>> ef6d8d7ca4afc00b5d1acb68b537ae16e2fd02f3
+    subprocess_cmd('cd '+script_path.get())
+    subprocess_cmd('python '+script.get()+' '+mouseID_s.get()+' '+rewardVolume_s.get()+' '+rewardWindow_s.get())
 startButton = tkinter.Button(m,text='START',bg='green',command=button_callback)
 startButton.grid(row=3,columnspan=1) 
 
