@@ -329,6 +329,7 @@ class MouseTunnel(ShowBase):
         # self.bufferViewer.toggleEnable()
         
         self.lick_buffer = []
+        self.trialData.extend([globalClock.getFrameTime()])
         
         if self.stimtype == 'random image':
             for i in range(randint(len(self.imageTextures))):
