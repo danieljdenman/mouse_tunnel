@@ -11,8 +11,10 @@ m.title("Mouse Tunnel")
 
 #DEFAULTS
 mouseID_='Enter Mouse ID'
-rewardVolume_='10'
-rewardWindow_='1.0'
+rewardVolume_ ='10'
+rewardWindow_ ='1.0'
+script_path_   ='C:\github\mouse_tunnel'
+script_        ='mouse_tunnel_base.py'
 
 def mouseID_callback():
     mouseID_ = mouseID_s.get()
@@ -38,14 +40,39 @@ rewardWindow_s = tkinter.StringVar(value=rewardWindow_)
 rewardWindow = tkinter.Entry(m, text='Reward Window',textvariable=rewardWindow_s,
                                 validate="focusout",validatecommand=rewardVolume_callback)
 rewardWindow.grid(row=2,column=1)
-    
+
+def script_path_callback():
+    mouseID_ = mouseID_s.get()
+L4 = tkinter.Label(m, text="Script Path")
+L4.grid(row=0,column=0)
+script_path_s = tkinter.StringVar(value = script_path_)
+script_path = tkinter.Entry(m, text='Script Path',textvariable=script_path_s,
+                        validate="focusout",validatecommand=script_path_)
+script_path.grid(row=3,column=1)
+
+def script_callback():
+    mouseID_ = mouseID_s.get()
+L5 = tkinter.Label(m, text="Script Name")
+L5.grid(row=0,column=0)
+script_s = tkinter.StringVar(value = script_)
+script = tkinter.Entry(m, text='Script Name',textvariable=script_s,
+                        validate="focusout",validatecommand=script_path_)
+script.grid(row=4,column=1)
+
 def button_callback():
+<<<<<<< HEAD
+    print('activate panda3d;\
+        #    cd C:\github\mouse_tunnel;\
+            cd '+script_path.get()+';'\
+           'python '+script.get()+' '+mouseID_s.get()+' '+rewardVolume_s.get()+' '+rewardWindow_s.get())
+=======
     subprocess_cmd('activate panda3d')
     subprocess_cmd('cd '+os.path.join('C:\\','github','mouse_tunnel'))
     subprocess_cmd('python mouse_tunnel_base.py '+mouseID_s.get()+' '+rewardVolume_s.get()+' '+rewardWindow_s.get())
     
            
            
+>>>>>>> ef6d8d7ca4afc00b5d1acb68b537ae16e2fd02f3
 startButton = tkinter.Button(m,text='START',bg='green',command=button_callback)
 startButton.grid(row=3,columnspan=1) 
 
