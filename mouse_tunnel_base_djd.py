@@ -28,16 +28,17 @@ except:# Exception, e:
 
 # sys.path.append('C:\github\syringe_pump')
 try:
-    from syringe_pump.stepper import Stepper
-    import time
-    s = Stepper(mode='arduino',port='COM3',syringe='3mL')
+    import sys
+    sys.path.append('C:\github\syringe_pump') # https://github.com/dougollerenshaw/syringe_pump
+    from stepper import Stepper
+    s = Stepper(mode='arduino',port='COM4',syringe='3mL')
 except:
     print('no reward hardware found')
 
 
-MOUSE_ID='m1'
-REWARD_VOLUME=10#in µL
-REWARD_WINDOW=1.0#in seconds
+MOUSE_ID='test'
+REWARD_VOLUME=15#in µL
+REWARD_WINDOW=1.5#in seconds
 
 # getopt.getopt(args, options, [long_options])
 
@@ -61,8 +62,8 @@ REWARD_WINDOW=1.0#in seconds
 #if TRUE, then the stimulus automatically advances to the next stop zone, waits, plays the stimulus, and delivers a reward. 
 # AUTO_MODE=False
 AUTO_MODE= False
-AUTO_REWARD = True
-
+AUTO_REWARD = False
+LICK_ABORT = False
 # Global variables for the tunnel dimensions and speed of travel
 TUNNEL_SEGMENT_LENGTH = 50
 TUNNEL_TIME = 2  # Amount of time for one segment to travel the
@@ -86,6 +87,8 @@ class MouseTunnel(ShowBase):
         self.downArrowIsPressed = base.mouseWatcherNode.isButtonDown(KeyboardButton.down())
 
         self.AUTO_REWARD = AUTO_REWARD
+        self.LICK_ABORT = LICK_ABORT
+
         # disable mouse control so that we can place the camera
         base.disableMouse()
         camera.setPosHpr(0, 0, 10, 0, -90, 0)
@@ -95,8 +98,8 @@ class MouseTunnel(ShowBase):
         # base.enableMouse()
         
         props = WindowProperties()
-        props.setOrigin(0,0)
-        props.setFullscreen(True)
+        props.setOrigin(1921,0)
+        props.setFullscreen(False)
         props.setCursorHidden(True)
         props.setMouseMode(WindowProperties.M_relative)
         base.win.requestProperties(props)
@@ -179,9 +182,9 @@ class MouseTunnel(ShowBase):
 
         
         #INITIALIZE NIDAQ
-        self.nidevice = 'Dev2'
+        self.nidevice = 'Dev1'
         self.encodervinchannel = 1
-        self.encodervsigchannel = 0
+        self.encodervsigchannel = 1
         self.invertdo = False
         self.diport = 1
         self.lickline = 1
@@ -196,7 +199,7 @@ class MouseTunnel(ShowBase):
             self.previous_encoder_position = self.ai.data[0][self.encodervsigchannel]
         else:
             self.previous_encoder_position = 0
-        self.encoder_gain = -10
+        self.encoder_gain = 12
 
         #INITIALIZE LICK SENSOR
         self._lickSensorSetup()
@@ -212,11 +215,13 @@ class MouseTunnel(ShowBase):
         self.keys = key.KeyStateHandler()
         self.accept('r', self._give_reward, [self.reward_volume])
         self.accept('l', self._toggle_reward)
+        self.accept('k', self._toggle_lick_abort)
 
-        img_list = glob.glob('models/NaturalImages/*.tiff')[:10]
+        from pathlib import Path
+        img_list = glob.glob('models/NaturalImages/*.tif*')[:10]
         print(img_list)
-        self.imageTextures =[loader.loadTexture(img) for img in img_list]
-        
+        self.imageTextures =[loader.loadTexture(Path(img)) for img in img_list]
+    
         self._setupEyetracking()
         self._startEyetracking()
 
@@ -392,6 +397,7 @@ class MouseTunnel(ShowBase):
             time.sleep(self.reward_time)
             self.do.WriteBit(3,1) # put a TTL on a line to indicate that a reward was given
             s.dispense(volume)#pass # not yet implemented
+            self.do.WriteBit(3,0)
 
     def _toggle_reward(self):
         if self.AUTO_REWARD:
@@ -400,6 +406,14 @@ class MouseTunnel(ShowBase):
         else:
             self.AUTO_REWARD = True
             print('switched to automatic rewards after stimuli.')
+
+    def _toggle_lick_abort(self):
+        if self.LICK_ABORT:
+            self.LICK_ABORT = False
+            print('switched to ignoring FA licks during stim.')
+        else:
+            self.LICK_ABORT = True
+            print('switched to aborting for FA licks during stimuli.')
 
     def autoLoop2(self, task):
         dt = globalClock.getDt()
@@ -571,7 +585,12 @@ class MouseTunnel(ShowBase):
         if self.lickSensor:
             if self.lickSensor.Read()[self.lickline]:
                 self.lickData.extend([globalClock.getFrameTime()])
-                print('lick happened at: '+str(self.lickData[-1]))
+                # print('lick happened at: '+str(self.lickData[-1]))
+                if self.LICK_ABORT:
+                    self.stop_a_presentation()
+                    self.time_waited=0
+                    self.looking_for_a_cue_zone = False
+                    self.show_stimulus=False
         elif self.keycontrol == True: #NO NI BOARD.  KEY INPUT?
             if self.keys[key.SPACE]:
                 data = [globalClock.getFrameTime()]
