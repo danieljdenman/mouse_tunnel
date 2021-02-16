@@ -42,11 +42,11 @@ except:
     print("Error:", sys.exc_info()[0])
     print('no reward hardware found')
 
-#MOUSE_ID='mouse_c43'
-MOUSE_ID='Beth'
+MOUSE_ID='mouse_c43_s'
+#MOUSE_ID='Beth'
 
 #REWARD_VOLUME=15#in µL
-REWARD_VOLUME=50#in µL
+REWARD_VOLUME=30#in µL
 REWARD_WINDOW=0.5#in seconds
 
 # getopt.getopt(args, options, [long_options])
@@ -226,6 +226,7 @@ class MouseTunnel(ShowBase):
             self.previous_encoder_position = 0
         #self.encoder_gain = 15 
         self.encoder_gain = 20
+        self.stopped_position = 0
 
         #INITIALIZE LICK SENSOR
         self._lickSensorSetup()
@@ -255,6 +256,7 @@ class MouseTunnel(ShowBase):
         self.accept('r', self._give_manual_reward, [self.reward_volume])
         self.accept('l', self._toggle_reward)
         self.accept('s', self._toggle_stop_reward)
+        self.accept('k', self._toggle_lick_abort)
 
         from pathlib import Path
         img_list = glob.glob('models/NaturalImages/*.tif*')[:10]
@@ -593,7 +595,10 @@ class MouseTunnel(ShowBase):
         if abs(self.last_position - position_on_track) < 1.5: #the mouse didn't move more than 0.5 units on the track
             if self.STOP_REWARD: #check if we are in a shaping mode that rewards all stopping. 
                 if self.moved:
-                    self._give_reward(self.reward_volume * self.stop_reward_fraction)
+                    # print(str(self.x[-1])+ ' <  '+str(self.stopped_position-100))
+                    if self.x[-1]  < self.stopped_position-100: #make sure the mouse has moved 100 units down the track before giving a another reward for stopping 
+                        self._give_reward(self.reward_volume * self.stop_reward_fraction)
+                        self.stopped_position=self.x[-1]
 
             self.moved=False
             if int(position_on_track) in self.cue_zone: #check for cue zone
